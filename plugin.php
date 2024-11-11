@@ -5,7 +5,7 @@ Plugin URI: https://github.com/bnfone/yourls-amazon-affiliate
 Description: Adds Amazon affiliate tags to all Amazon URLs, including short links, and allows management of affiliate IDs via the GUI. Forked from https://github.com/floschliep/YOURLS-Amazon-Affiliate-Extended
 Version: 1.0
 Author: Blake
-Author URI: https://bnfone.com
+Author URI: https://github.com/bnfone/
 */
 
 // Security check to prevent direct access
