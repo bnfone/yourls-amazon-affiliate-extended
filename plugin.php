@@ -2,223 +2,146 @@
 /*
 Plugin Name: Amazon Affiliate Extended
 Plugin URI: https://github.com/bnfone/yourls-amazon-affiliate
-Description: Adds Amazon affiliate tags to all Amazon URLs, including short links, and allows management of affiliate IDs via the GUI. Forked from https://github.com/floschliep/YOURLS-Amazon-Affiliate-Extended
-Version: 1.0
+Description: Adds Amazon affiliate tags to all Amazon URLs, including short links, and allows management of affiliate IDs via the GUI.
+Version: 2.0
 Author: Blake
 Author URI: https://github.com/bnfone/
+License: MIT
 */
 
-// Security check to prevent direct access
-if( !defined( 'YOURLS_ABSPATH' ) ) die();
+// Prevent direct access
+if (!defined('YOURLS_ABSPATH')) die();
 
-// Hook into the 'pre_redirect' action
-yourls_add_action('pre_redirect', 'flo_amazonAffiliate');
+// Hooks
+yourls_add_action('pre_redirect', 'aae_handle_amazon_links');
+yourls_add_action('plugins_loaded', 'aae_init_admin');
 
-// Hook into 'plugins_loaded' to register the admin page
-yourls_add_action('plugins_loaded', 'flo_amazonAffiliate_init');
-
-function flo_amazonAffiliate_init() {
-    // Register the admin page
-    yourls_register_plugin_page('amazon_affiliate_extended', 'Amazon Affiliate Extended', 'flo_amazonAffiliate_display_page');
+/**
+ * Register admin settings page
+ */
+function aae_init_admin() {
+    yourls_register_plugin_page('amazon_affiliate_extended', 'Amazon Affiliate Extended', 'aae_display_admin_page');
 }
 
-// Function to display the admin page
-function flo_amazonAffiliate_display_page() {
-    // Check if the form has been submitted
-    if( isset($_POST['submit']) ) {
-        // Check security nonce (optional but recommended)
-        // Save the affiliate IDs
-        $tags = array(
-            'in' => yourls_sanitize_string($_POST['tagIN']),
-            'it' => yourls_sanitize_string($_POST['tagIT']),
-            'us' => yourls_sanitize_string($_POST['tagUS']),
-            'de' => yourls_sanitize_string($_POST['tagDE']),
-            'uk' => yourls_sanitize_string($_POST['tagUK']),
-            'fr' => yourls_sanitize_string($_POST['tagFR']),
-            'es' => yourls_sanitize_string($_POST['tagES']),
-            'jp' => yourls_sanitize_string($_POST['tagJP']),
-            'au' => yourls_sanitize_string($_POST['tagAU'])
-        );
-        $campaign = yourls_sanitize_string($_POST['campaign']);
-        
-        // Save the options
-        yourls_update_option('flo_amazonAffiliate_tags', $tags);
-        yourls_update_option('flo_amazonAffiliate_campaign', $campaign);
-        
-        echo yourls_safe_redirect(yourls_admin_url('plugins.php'), 0, 'redirect');
-    }
+/**
+ * Admin page to manage affiliate tags per region
+ */
+function aae_display_admin_page() {
+    $message = '';
     
-    // Load saved affiliate IDs
-    $tags = yourls_get_option('flo_amazonAffiliate_tags');
-    $campaign = yourls_get_option('flo_amazonAffiliate_campaign');
+    if (isset($_POST['submit'])) {
+        // Save tags
+        $regions = array('us','ca','mx','br','uk','de','fr','es','it','nl','se','pl','ae','sa','in','jp','sg','cn','au');
+        $tags = array();
+        foreach ($regions as $r) {
+            $key = 'tag'.strtoupper($r);
+            $tags[$r] = yourls_sanitize_string($_POST[$key]);
+        }
+        yourls_update_option('aae_tags', $tags);
+        $message = '<div style="background-color: #d4edda; color: #155724; padding: 10px; border: 1px solid #c3e6cb; border-radius: 4px; margin: 10px 0;"><strong>Success:</strong> Your configuration was sucessfully saved!</div>';
+    }
+
+    // Load saved tags
+    $tags = yourls_get_option('aae_tags');
+    $defaults = array_fill_keys(array('us','ca','mx','br','uk','de','fr','es','it','nl','se','pl','ae','sa','in','jp','sg','cn','au'), '');
+    $tags = is_array($tags) ? array_merge($defaults, $tags) : $defaults;
     ?>
     <h2>Amazon Affiliate Extended Settings</h2>
+    <?php echo $message; ?>
     <form method="post" action="">
-        <table>
-            <tr>
-                <th>Region</th>
-                <th>Affiliate ID</th>
-            </tr>
-            <tr>
-                <td>India (IN)</td>
-                <td><input type="text" name="tagIN" value="<?php echo htmlspecialchars($tags['in']); ?>" /></td>
-            </tr>
-            <tr>
-                <td>Italy (IT)</td>
-                <td><input type="text" name="tagIT" value="<?php echo htmlspecialchars($tags['it']); ?>" /></td>
-            </tr>
-            <tr>
-                <td>USA (US)</td>
-                <td><input type="text" name="tagUS" value="<?php echo htmlspecialchars($tags['us']); ?>" /></td>
-            </tr>
-            <tr>
-                <td>Germany (DE)</td>
-                <td><input type="text" name="tagDE" value="<?php echo htmlspecialchars($tags['de']); ?>" /></td>
-            </tr>
-            <tr>
-                <td>UK</td>
-                <td><input type="text" name="tagUK" value="<?php echo htmlspecialchars($tags['uk']); ?>" /></td>
-            </tr>
-            <tr>
-                <td>France (FR)</td>
-                <td><input type="text" name="tagFR" value="<?php echo htmlspecialchars($tags['fr']); ?>" /></td>
-            </tr>
-            <tr>
-                <td>Spain (ES)</td>
-                <td><input type="text" name="tagES" value="<?php echo htmlspecialchars($tags['es']); ?>" /></td>
-            </tr>
-            <tr>
-                <td>Japan (JP)</td>
-                <td><input type="text" name="tagJP" value="<?php echo htmlspecialchars($tags['jp']); ?>" /></td>
-            </tr>
-            <tr>
-                <td>Australia (AU)</td>
-                <td><input type="text" name="tagAU" value="<?php echo htmlspecialchars($tags['au']); ?>" /></td>
-            </tr>
-            <tr>
-                <td>Campaign</td>
-                <td><input type="text" name="campaign" value="<?php echo htmlspecialchars($campaign); ?>" /></td>
-            </tr>
-        </table>
-        <p><input type="submit" name="submit" value="Save Settings" /></p>
+    <table>
+        <tr><th>Region</th><th>Affiliate ID (Tag)</th></tr>
+        <?php foreach ($tags as $region => $id): ?>
+        <tr>
+            <td><?php echo strtoupper($region); ?></td>
+            <td><input type="text" name="tag<?php echo strtoupper($region); ?>" value="<?php echo htmlspecialchars($id); ?>" size="30" /></td>
+        </tr>
+        <?php endforeach; ?>
+    </table>
+    <p><input type="submit" name="submit" value="Save Settings" /></p>
     </form>
     <?php
 }
 
-function flo_amazonAffiliate($args) {
-    // Load saved affiliate IDs
-    $settings = yourls_get_option('flo_amazonAffiliate_tags');
-    $campaign = yourls_get_option('flo_amazonAffiliate_campaign');
-    
-    // Use default values if settings are not set
-    $tagIN = isset($settings['in']) ? $settings['in'] : null;
-    $tagIT = isset($settings['it']) ? $settings['it'] : null;
-    $tagUS = isset($settings['us']) ? $settings['us'] : null;
-    $tagDE = isset($settings['de']) ? $settings['de'] : null;
-    $tagUK = isset($settings['uk']) ? $settings['uk'] : null;
-    $tagFR = isset($settings['fr']) ? $settings['fr'] : null;
-    $tagES = isset($settings['es']) ? $settings['es'] : null;
-    $tagJP = isset($settings['jp']) ? $settings['jp'] : null;
-    $tagAU = isset($settings['au']) ? $settings['au'] : null;
-    
-    // Get the URL from the arguments
-    $url = $args[0];
-    
-    // Create an array with regex patterns and corresponding affiliate tags
-    $patternTagPairs = array(
-        '/^http(s)?:\/\/(www\.)?amazon\.in\//ui' => $tagIN,
-        '/^http(s)?:\/\/(www\.)?amazon\.it\//ui' => $tagIT,
-        '/^http(s)?:\/\/(www\.)?amazon\.com\.au\//ui' => $tagAU,
-        '/^http(s)?:\/\/(www\.)?amazon\.com\//ui' => $tagUS,
-        '/^http(s)?:\/\/(www\.)?amazon\.de\//ui' => $tagDE,
-        '/^http(s)?:\/\/(www\.)?amazon\.co\.uk\//ui' => $tagUK,
-        '/^http(s)?:\/\/(www\.)?amazon\.fr\//ui' => $tagFR,
-        '/^http(s)?:\/\/(www\.)?amazon\.es\//ui' => $tagES,
-        '/^http(s)?:\/\/(www\.)?amazon\.co\.jp\//ui' => $tagJP,
-        // Support for Amazon short links
-        '/^http(s)?:\/\/(www\.)?amzn\.(eu|to|de|co\.jp|com\.au|ca|fr|es|it|in|co\.uk)\/d\//ui' => $tagDE // Defaults to US tag, can be customized
+/**
+ * Main redirect handler: resolve short links, append affiliate tag
+ */
+function aae_handle_amazon_links($args) {
+    $original_url = $args[0];
+    $tags = yourls_get_option('aae_tags');
+
+    // 1. Unshort Amazon shortlinks (a.co, amzn.to, amzn.eu, amzn.asia)
+    if (preg_match('#^https?://(www\.)?(a\.co|amzn\.to|amzn\.eu|amzn\.asia)/(.*)#i', $original_url)) {
+        $headers = @get_headers($original_url, 1);
+        if (isset($headers['Location'])) {
+            $original_url = is_array($headers['Location']) ? end($headers['Location']) : $headers['Location'];
+        }
+    }
+
+    // 2. Domain-to-region mapping
+    $map = array(
+        'amazon\.com'     => 'us',
+        'amazon\.ca'      => 'ca',
+        'amazon\.com\.mx' => 'mx',
+        'amazon\.com\.br' => 'br',
+        'amazon\.co\.uk'  => 'uk',
+        'amazon\.de'      => 'de',
+        'amazon\.fr'      => 'fr',
+        'amazon\.es'      => 'es',
+        'amazon\.it'      => 'it',
+        'amazon\.nl'      => 'nl',
+        'amazon\.se'      => 'se',
+        'amazon\.pl'      => 'pl',
+        'amazon\.ae'      => 'ae',
+        'amazon\.sa'      => 'sa',
+        'amazon\.in'      => 'in',
+        'amazon\.co\.jp'  => 'jp',
+        'amazon\.sg'      => 'sg',
+        'amazon\.cn'      => 'cn',
+        'amazon\.com\.au' => 'au'
     );
-    
-    // Check if the URL is a supported Amazon URL
-    foreach ($patternTagPairs as $pattern => $tag) {
-        if (preg_match($pattern, $url)) {
+
+    // Match domain
+    foreach ($map as $pattern => $region) {
+        if (preg_match("#^https?://(www\.)?". $pattern ."#i", $original_url)) {
+            $tag = isset($tags[$region]) ? $tags[$region] : '';
             if (empty($tag)) {
-                // No affiliate tag set for this region
+                // No tag for this region
                 return;
             }
-            
-            // Modify the URL
-            $url = cleanUpURL($url);
-            $url = addTagToURL($url, $tag);
-            $url = addCampaignToURL($url, $campaign);
-            
-            // Perform the redirect
+            // Clean and append
+            $url = aae_clean_url($original_url);
+            $url = aae_add_query_param($url, 'tag', $tag);
+
+            // Redirect
             header("HTTP/1.1 301 Moved Permanently");
-            header("Location: $url");
-            
-            // Exit script to interrupt normal flow
-            die();
+            header("Location: " . $url);
+            exit;
         }
     }
 }
 
-function cleanUpURL($url) {
-    // Remove trailing slash
-    if (substr($url, -1) == "/") {
-        $url = substr($url, 0, -1);
-    }
-    
-    // Remove existing affiliate tags
-    if (preg_match('/([&?]tag=)[^&]+/i', $url, $matches)) {
-        $url = preg_replace('/([&?]tag=)[^&]+/i', '$1', $url);
-    }
-    
-    // Remove existing campaign parameters
-    if (preg_match('/([&?]camp=)[^&]+/i', $url, $matches)) {
-        $url = preg_replace('/([&?]camp=)[^&]+/i', '$1', $url);
-    }
-    
-    // Clean up duplicate & or ? characters
+/**
+ * Remove existing tag param & tidy URL
+ */
+function aae_clean_url($url) {
+    // Trim slash
+    $url = rtrim($url, '/');
+    // Remove existing tag
+    $url = preg_replace('/([&?])tag=[^&]+/i', '\\1', $url);
+    // Clean up leftover ?& or &&
     $url = preg_replace('/\?&/', '?', $url);
     $url = preg_replace('/&&/', '&', $url);
-    
+    // Trim trailing ? or &
+    $url = rtrim($url, '?&');
     return $url;
 }
 
-function addTagToURL($url, $tag) {
-    // Check if the URL already has a query string
-    if (strpos($url, '?') !== false) {
-        // Append the tag with &
-        if (substr($url, -1) == "&") {
-            $url .= 'tag=' . $tag;
-        } else {
-            $url .= '&tag=' . $tag;
-        }
-    } else {
-        // Start a new query string
-        $url .= '?tag=' . $tag;
-    }
-    
-    return $url;
+/**
+ * Generic add or append query parameter
+ */
+function aae_add_query_param($url, $key, $value) {
+    $sep = (strpos($url, '?') !== false) ? '&' : '?';
+    return $url . $sep . urlencode($key) . '=' . urlencode($value);
 }
-
-function addCampaignToURL($url, $campaign) {
-    if (empty($campaign)) {
-        return $url;
-    }
-    
-    // Add the campaign parameter
-    if (strpos($url, '?') !== false) {
-        if (substr($url, -1) == "&") {
-            $url .= 'camp=' . $campaign;
-        } else {
-            $url .= '&camp=' . $campaign;
-        }
-    } else {
-        $url .= '?camp=' . $campaign;
-    }
-    
-    return $url;
-}
-
 ?>
